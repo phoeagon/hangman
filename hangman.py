@@ -67,8 +67,9 @@ class DictParser(object):
 			
 class DictSolver(Solver):
 
-	def __init__(self, dct):
+	def __init__(self, dct, lim=1000):
 		self.dct = dct
+		self.lim = lim
 
 	def next(self, word, lifes, options):
 		potentials = {}
@@ -79,25 +80,54 @@ class DictSolver(Solver):
 				newmatch = filter(lambda x: not x[1].isalpha(), pair)
 				if not conflict:
 					new_letters = set(zip(*newmatch)[0])
-					if not set(new_letters).intersection(set(word)):
+					if not new_letters.intersection(set(word)):
 						# New matches should have no letters that 
 						#  should've revealed already if correct
-						potentials[wd] = new_letters
+						if new_letters.intersection(set(options)) == new_letters:
+							# All new letters should be in potentials
+							potentials[wd] = new_letters
 		if not potentials:
 			for x in options:
 				return (x, 0)
 		letters = reduce(set.union, potentials.values())
+		# print potentials
 		# We try to split into two even sets so that after this
 		#   query, the candidate set size is minimized
-		count_occurrence = {x: sum([int(x in wd) for wd in potentials.keys()]) for x in letters}
-		evaluate = lambda x: abs(count_occurrence[x] * 2.0 - len(potentials))
-		choice = min(letters, key=evaluate)
-		return (choice, 1 - evaluate(choice) / len(potentials))
+		count_occurrence = {x: -sum([int(x in wd) for wd in potentials.keys()]) for x in letters}
+		#print count_occurrence
+		choice = min(letters, key=count_occurrence.get)
+		return (choice, -count_occurrence[choice] * 1.0 / len(potentials))
 			
-						
+
+class Bot(Solver):
+
+	def __init__(self):
+		self.bots = [NGramSolver(NGramStats().stats(n), n) for n in range(1,4)]
+		self.bots.append(DictSolver(DictParser().parse()))
+			
+	def next(self, word, lifes, options):
+		ret = [self.bots[i].next(word, lifes, options) for i in range(len(self.bots))]
+		print ret
+		choice_pair = min(ret, key=lambda x: -x[1])
+		return choice_pair
 	
 def main():
+	demo()
+	Bot()
+
+def demo():
+	bot = Bot()
+	bot.next('a--le', 5, ''.join(LETTER_SET))
+	bot.next('a--le', 5, 'bpcdefg')
+	bot.next('-----', 5, 'bpcdefg')
+	bot.next('a----', 5, ''.join(LETTER_SET))
+	bot.next('v-v-d', 5, 'aeiou')
+	
+def demo2():
 	print DictSolver(DictParser().parse()).next('a--le', 5, ''.join(LETTER_SET))
+	print DictSolver(DictParser().parse()).next('a--le', 5, 'bpcdefg')
+	print DictSolver(DictParser().parse()).next('-----', 5, 'bpcdefg')
+	print DictSolver(DictParser().parse()).next('a----', 5, ''.join(LETTER_SET))
 	return
 	test1()
 	test2(1)
