@@ -46,13 +46,20 @@ class NGramSolver(Solver):
 
 	def next(self, word, lifes, options):
 		word =  ''.join([ c if c.isalnum() else '-' for c in word ])
+		# If maximum vacant is of length 1, 1-gram is suppressed
+		if self.n == 1 and word.count('-') < 3:
+			return (options[0], 0)
 		ans = defaultdict(lambda: 0.0)
 		for i in range(len(word) - self.n + 1):
 			v = word[i:i + self.n]
 			if not v.isalpha():
 				for x in options:
 					ans[x] += self.data[v.replace('-', x)]
+		if not ans:
+			return ('a', 0)
 		# print {a: ans[a] for a in list(reversed(sorted(ans.keys(), key=ans.get)))[:10]}
+		total = max(sum(ans.values()), 1e-4)
+		ans = {key: ans[key] * 1.0 / total for key in ans}
 		char = max(ans, key=ans.get)
 		return (char, ans[char] / self.n)
 
@@ -102,7 +109,7 @@ class DictSolver(Solver):
 class Bot(Solver):
 
 	def __init__(self):
-		self.bots = [NGramSolver(NGramStats().stats(n), n) for n in range(1,4)]
+		self.bots = [NGramSolver(NGramStats().stats(n), n) for n in range(1, 6)]
 		self.bots.append(DictSolver(DictParser().parse()))
 			
 	def next(self, word, lifes, options):
@@ -117,11 +124,11 @@ def main():
 
 def demo():
 	bot = Bot()
-	bot.next('a--le', 5, ''.join(LETTER_SET))
-	bot.next('a--le', 5, 'bpcdefg')
-	bot.next('-----', 5, 'bpcdefg')
-	bot.next('a----', 5, ''.join(LETTER_SET))
-	bot.next('v-v-d', 5, 'aeiou')
+	print bot.next('a--le', 5, ''.join(LETTER_SET))
+	print bot.next('a--le', 5, 'bpcdefg')
+	print bot.next('-----', 5, 'bpcdefg')
+	print bot.next('a----', 5, ''.join(LETTER_SET))
+	print bot.next('v-v-d', 5, 'aeiou')
 	
 def demo2():
 	print DictSolver(DictParser().parse()).next('a--le', 5, ''.join(LETTER_SET))
