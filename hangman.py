@@ -3,8 +3,11 @@
 from collections import defaultdict
 from operator import or_
 
+EPS = 1e-4
 DEFAULT_FILENAME = '/etc/dictionaries-common/words'
 LETTER_SET = map(chr, range(ord('a'), ord('z')+1))
+PREFIX = {'anti', 'co', 'counter', 'pre', 'post', 'neo', 'e', 'cyber', 'micro', 'nano', 'macro'}
+SUFFIX = {'ness', 'ism', 'ist', 'ment', 'less', 'ful', 'ing', 'philia', 'phobia', 'holic'}
 
 class Solver(object):
 
@@ -58,7 +61,7 @@ class NGramSolver(Solver):
 		if not ans:
 			return ('a', 0)
 		# print {a: ans[a] for a in list(reversed(sorted(ans.keys(), key=ans.get)))[:10]}
-		total = max(sum(ans.values()), 1e-4)
+		total = max(sum(ans.values()), EPS)
 		ans = {key: ans[key] * 1.0 / total for key in ans}
 		char = max(ans, key=ans.get)
 		return (char, ans[char] / self.n)
@@ -70,7 +73,7 @@ class DictParser(object):
 		f = open(filename, 'r')
 		if not f:
 			raise Exception()
-		return {key.lower().strip() for key in f.readlines()}
+		return {key.lower().strip() for key in f.readlines()}.union(PREFIX).union(SUFFIX)
 			
 class DictSolver(Solver):
 
@@ -105,12 +108,39 @@ class DictSolver(Solver):
 		choice = min(letters, key=count_occurrence.get)
 		return (choice, -count_occurrence[choice] * 1.0 / len(potentials))
 			
+class CombineDictSolver(Solver):
 
+	def __init__(self, solver):
+		self.solver = solver
+
+	def next(self, word, lifes, options):
+		ret = self.solver.next(word, lifes, options)
+		if ret[1] > EPS:
+			return ret
+		ans = []
+		for i in range(2, len(word)-1 ): # At least len=2 in each part
+			wa = word[0:i]
+			wb = word[i:]
+			reta = self.solver.next(wa, lifes/2, options) if '-' in wa else (options[0], 2)
+			retb = self.solver.next(wb, lifes/2, options) if '-' in wb else (options[0], 2)
+			# print wa, wb, reta, retb
+			if reta[1] < retb[1]:
+				ans.append((wa, wb, reta[0], reta[1]))
+			else:
+				ans.append((wa, wb, retb[0], retb[1]))
+		# print ans
+		if not ans:
+			return (options[0], 0)
+		choice = max(ans, key=lambda x: x[3])
+		return (choice[2], choice[3] * 0.3)
+			 
 class Bot(Solver):
 
 	def __init__(self):
 		self.bots = [NGramSolver(NGramStats().stats(n), n) for n in range(1, 6)]
-		self.bots.append(DictSolver(DictParser().parse()))
+		solver = DictSolver(DictParser().parse())
+		self.bots.append(solver)
+		self.bots.append(CombineDictSolver(solver))
 			
 	def next(self, word, lifes, options):
 		ret = [self.bots[i].next(word, lifes, options) for i in range(len(self.bots))]
@@ -124,6 +154,9 @@ def main():
 
 def demo():
 	bot = Bot()
+	
+	print bot.next('street-ighting', 5, 'bcdlmnxyz')
+	print bot.next('-abl-idese', 5, 'kmopqtuvwxyz')
 	print bot.next('a--le', 5, ''.join(LETTER_SET))
 	print bot.next('a--le', 5, 'bpcdefg')
 	print bot.next('-----', 5, 'bpcdefg')

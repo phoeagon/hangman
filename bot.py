@@ -11,6 +11,7 @@ import random
 logging.basicConfig()
 HANGBOT = 'HangBot'
 LOG_FILE = '/run/shm/hangbot.log'
+
 def connect():
     global tg, receiver, sender
     tg = Telegram(
@@ -108,7 +109,7 @@ def example_function(receiver):
                     logging.warn(choice)
                     time.sleep(random.randint(1,3))
                     sender.send_msg(sender_cmd, choice.decode('utf8'))
-            except Exception:
+            except:
                 logging.exception('')
                 pass
     except KeyboardInterrupt:
